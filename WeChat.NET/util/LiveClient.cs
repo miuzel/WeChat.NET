@@ -22,7 +22,7 @@ namespace WeChat.NET.util
 
         public static void PrintData(string input)
         {
-            byte[] bt = System.Text.Encoding.Unicode.GetBytes(input);
+            byte[] bt = System.Text.Encoding.UTF8.GetBytes(input);
             PrintData(bt);
         }
 

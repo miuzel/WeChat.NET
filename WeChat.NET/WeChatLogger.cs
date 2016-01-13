@@ -118,7 +118,7 @@ namespace WeChat.NET
                             foreach (JObject m in sync_result["AddMsgList"])
                             {
                                 LiveClient.PrintData(m.ToString());
-                                LiveClient.PrintData("\n");
+                                LiveClient.PrintData(",\n");
                             }
                         }
                     }
