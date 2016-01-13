@@ -7,6 +7,8 @@ using Newtonsoft.Json.Linq;
 using System.Drawing;
 using System.IO;
 using System.Net;
+using WeChat.NET.util;
+using log4net;
 
 namespace WeChat.NET.HTTP
 {
@@ -16,9 +18,10 @@ namespace WeChat.NET.HTTP
     class WXService
     {
         private static Dictionary<string, string> _syncKey = new Dictionary<string, string>();
+        protected static ILog log = log4net.LogManager.GetLogger("WeChatLog.Log");
 
         //微信初始化url
-        private static string _init_url = "https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxinit?r=1377482058764";
+        private static string _init_url = "https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxinit?r={0}";
         //获取好友头像
         private static string _geticon_url = "https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxgeticon?username=";
         //获取群聊（组）头像
@@ -38,21 +41,29 @@ namespace WeChat.NET.HTTP
         /// <returns></returns>
         public JObject WxInit()
         {
-            string init_json = "{{\"BaseRequest\":{{\"Uin\":\"{0}\",\"Sid\":\"{1}\",\"Skey\":\"\",\"DeviceID\":\"e1615250492\"}}}}";
+            //string init_json = "{{\"BaseRequest\":{{\"Uin\":\"{0}\",\"Sid\":\"{1}\",\"Skey\":\"\",\"DeviceID\":\"e1615250492\"}}}}";
+            string init_json = "{{\"BaseRequest\":{{\"Uin\":\"{0}\",\"Sid\":\"{1}\",\"Skey\":\"\",\"DeviceID\":\"e2324132323\"}}}}";
+            string init_url = "";
             Cookie sid = BaseService.GetCookie("wxsid");
             Cookie uin = BaseService.GetCookie("wxuin");
 
             if (sid != null && uin != null)
             {
                 init_json = string.Format(init_json, uin.Value, sid.Value);
+                init_url = string.Format(_init_url, (long)(DateTime.Now.ToUniversalTime() - new DateTime(1970, 1, 1)).TotalMilliseconds);
                 byte[] bytes = BaseService.SendPostRequest(_init_url + "&pass_ticket=" + LoginService.Pass_Ticket, init_json);
                 string init_str = Encoding.UTF8.GetString(bytes);
 
+                log.Debug( "Login Response: \n" + init_str);
                 JObject init_result = JsonConvert.DeserializeObject(init_str) as JObject;
 
-                foreach (JObject synckey in init_result["SyncKey"]["List"])  //同步键值
+                if (init_result["SyncKey"]["Count"].ToString() != "0")
                 {
-                    _syncKey.Add(synckey["Key"].ToString(), synckey["Val"].ToString());
+                    _syncKey.Clear();
+                    foreach (JObject synckey in init_result["SyncKey"]["List"])  //同步键值
+                    {
+                        _syncKey.Add(synckey["Key"].ToString(), synckey["Val"].ToString());
+                    }
                 }
                 return init_result;
             }
@@ -98,29 +109,38 @@ namespace WeChat.NET.HTTP
         /// 微信同步检测
         /// </summary>
         /// <returns></returns>
-        public string WxSyncCheck()
+        public JObject WxSyncCheck()
         {
             string sync_key = "";
+            List<string> parts = new List<string>();
             foreach (KeyValuePair<string, string> p in _syncKey)
             {
-                sync_key += p.Key + "_" + p.Value + "%7C";
+                parts.Add(p.Key + "_" + p.Value);
             }
-            sync_key = sync_key.TrimEnd('%','7','C');
+            sync_key = string.Join("%7C",parts);
 
             Cookie sid = BaseService.GetCookie("wxsid");
             Cookie uin = BaseService.GetCookie("wxuin");
 
             if (sid != null && uin != null)
             {
-                _synccheck_url = string.Format(_synccheck_url, sid.Value, uin.Value, sync_key, (long)(DateTime.Now.ToUniversalTime() - new System.DateTime(1970, 1, 1)).TotalMilliseconds, LoginService.SKey.Replace("@", "%40"), "e1615250492");
+                log.Debug("sync_key " + sync_key + "\n");
+                string synccheck_url = string.Format(_synccheck_url, sid.Value, uin.Value, sync_key, (long)(DateTime.Now.ToUniversalTime() - new System.DateTime(1970, 1, 1)).TotalMilliseconds, LoginService.SKey.Replace("@", "%40"), "e1615250492");
+                log.Debug("synccheck_url " + synccheck_url + "\n");
 
-                byte[] bytes = BaseService.SendGetRequest(_synccheck_url +"&_=" + DateTime.Now.Ticks);
+                byte[] bytes = BaseService.SendGetRequest(synccheck_url + "&_=" + DateTime.Now.Ticks);
+
                 if (bytes != null)
                 {
-                    return Encoding.UTF8.GetString(bytes);
+                    string s = Encoding.UTF8.GetString(bytes);
+                    log.Debug( "synccheckResponse:\n"+  s );
+                    s = s.Replace("window.synccheck=", "");
+                    JObject synccheck_resul = JsonConvert.DeserializeObject(s) as JObject;
+                    return synccheck_resul;
                 }
                 else
                 {
+                    log.Debug("synccheckResponse is null\n");
                     return null;
                 }
             }
@@ -151,14 +171,21 @@ namespace WeChat.NET.HTTP
             {
                 byte[] bytes = BaseService.SendPostRequest(_sync_url + sid.Value + "&lang=zh_CN&skey=" + LoginService.SKey + "&pass_ticket=" + LoginService.Pass_Ticket, sync_json);
                 string sync_str = Encoding.UTF8.GetString(bytes);
-
+                log.Debug("SynResString:" + sync_str + "\n");
                 JObject sync_resul = JsonConvert.DeserializeObject(sync_str) as JObject;
+
+                if (sync_resul["BaseResponse"]["Ret"].ToString() != "0")
+                {
+                    log.Debug("Sync Failed With code "+sync_resul["BaseResponse"]["Ret"].ToString() +" \n");
+                    return null;
+                }
 
                 if (sync_resul["SyncKey"]["Count"].ToString() != "0")
                 {
                     _syncKey.Clear();
                     foreach (JObject key in sync_resul["SyncKey"]["List"])
                     {
+                        log.Debug("SynRes:" + key["Key"].ToString() +":"+ key["Val"].ToString() + "\n");
                         _syncKey.Add(key["Key"].ToString(), key["Val"].ToString());
                     }
                 }

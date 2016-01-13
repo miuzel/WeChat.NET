@@ -84,6 +84,21 @@ namespace WeChat.NET
                                 picQRCode.Image = login_result as Image;
                                 linkReturn.Visible = true;
                             });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
                         }
                         if (login_result is string)  //已完成登录
                         {
@@ -94,8 +109,18 @@ namespace WeChat.NET
                             this.BeginInvoke((Action)delegate()
                             {
                                 this.Hide();
-                                frmMainForm frmmf = new frmMainForm();
-                                frmmf.Show();
+                                //frmMainForm frmmf = new frmMainForm();
+                                //frmmf.Run()
+
+                                //this.EndInvoke(res);
+                            });
+                            this.BeginInvoke((Action)delegate ()
+                            {
+                                WeChatLogger thelogger = new WeChatLogger();
+                                thelogger.MainLogic();
+                                this.Show();
+                                DoLogin();
+
                             });
                             break;
                         }

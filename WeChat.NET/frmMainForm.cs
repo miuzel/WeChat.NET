@@ -9,6 +9,7 @@ using System.Windows.Forms;
 using WeChat.NET.Controls;
 using WeChat.NET.Objects;
 using WeChat.NET.HTTP;
+using WeChat.NET.util;
 using Newtonsoft.Json.Linq;
 
 namespace WeChat.NET
@@ -219,7 +220,7 @@ namespace WeChat.NET
                 }));
 
 
-                string sync_flag = "";
+                JObject sync_flag;
                 JObject sync_result;
                 while (true)
                 {
@@ -250,6 +251,8 @@ namespace WeChat.NET
                                     msg.Time = DateTime.Now;
                                     msg.To = to;
                                     msg.Type = int.Parse(type);
+
+
 
                                     if (msg.Type == 51)  //屏蔽一些系统数据
                                     {
